@@ -402,7 +402,10 @@ for i in $mnt_devices ; do
 done
 
 rm $MOUNT/etc/resolv.conf
-rm $MOUNT/usr/bin/qemu-arm-static
+if [ $ARCH != "armhf" ]
+then
+  rm $MOUNT/usr/bin/qemu-arm-static
+fi
 
 sync
 sleep 10
