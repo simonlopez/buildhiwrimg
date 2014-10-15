@@ -16,7 +16,8 @@ SDIMG_MB="2048"
 SDIMG_FILE="$HOME/hiwr.sdimg"
 # build directory
 BUILD_DIR="$HOME/hiwr-build"
-
+# DISTRO
+DISTRO=wheezy
 
 #########
 # BUILD #
@@ -29,24 +30,36 @@ show_time() {
   printf "%02d:%02d:%02d\n" $h $m $s
 }
 
+ARCH=`dpkg --print-architecture`
+
 if [ ! -e $BUILD_DIR ]
 then
   echo === Building ===
   START=`date +"%s"`
   mkdir $BUILD_DIR
   cd $BUILD_DIR
-  # add emdebian repositories
-  grep "emdebian" /etc/apt/sources.list > /dev/null 2> /dev/null
-  if [ $? -ne 0 ]
-  then
-    echo "deb http://www.emdebian.org/debian wheezy main" >> /etc/apt/sources.list
-    echo "deb http://www.emdebian.org/debian sid main" >> /etc/apt/sources.list
-  fi
-  # install needed packages
-  apt-get update
-  apt-get install -y emdebian-archive-keyring
-  apt-get install -y parted gcc-4.7-arm-linux-gnueabihf ncurses-dev uboot-mkimage build-essential git dosfstools kpartx qemu-user-static debootstrap binfmt-support qemu
+  case $ARCH in
+    armhf)
+      echo "armhf, no cross compile needed"
+      apt-get install -y gcc-4.7
+      ;;
+    *)
+      echo "$ARCH crosscompile needed"
+      # add emdebian repositories
+      grep "emdebian" /etc/apt/sources.list > /dev/null 2> /dev/null
+      if [ $? -ne 0 ]
+      then
+        echo "deb http://www.emdebian.org/debian wheezy main" >> /etc/apt/sources.list
+        echo "deb http://www.emdebian.org/debian sid main" >> /etc/apt/sources.list
+      fi
+      # install needed packages
+      apt-get update
+      apt-get install -y emdebian-archive-keyring
+      apt-get install -y gcc-4.7-arm-linux-gnueabihf
+  esac
+  apt-get install -y parted ncurses-dev uboot-mkimage build-essential git dosfstools kpartx qemu-user-static debootstrap binfmt-support qemu
   # a little hack
+  rm /usr/bin/arm-linux-gnueabihf-gcc
   ln -s /usr/bin/arm-linux-gnueabihf-gcc-4.7 /usr/bin/arm-linux-gnueabihf-gcc
   echo === Building Uboot ===
   rm -Rf u-boot-sunxi
@@ -165,11 +178,15 @@ umount $MOUNT
 echo === Build pure Debian armhf rootfs ===
 cd $BUILD_DIR
 mount $PART2 $MOUNT
-distro=wheezy
 
 echo === debootstrap first phase ===
-debootstrap --arch=armhf --foreign $distro $MOUNT http://ftp.debian.org/debian
-cp /usr/bin/qemu-arm-static $MOUNT/usr/bin/
+debootstrap --arch=armhf --foreign $DISTRO $MOUNT http://ftp.debian.org/debian
+
+if [ $ARCH != "armhf" ]
+then
+  cp /usr/bin/qemu-arm-static $MOUNT/usr/bin/
+fi
+
 cp /etc/resolv.conf $MOUNT/etc
 
 echo === debootstrap second phase ===
@@ -190,14 +207,14 @@ fi
 
 echo === post debootstrap ===
 cat <<EOT > $MOUNT/etc/apt/sources.list
-deb http://ftp.debian.org/debian $distro main contrib non-free
-deb-src http://ftp.debian.org/debian $distro main contrib non-free
-deb http://ftp.debian.org/debian $distro-updates main contrib non-free
-deb-src http://ftp.debian.org/debian $distro-updates main contrib non-free
-deb http://ftp.debian.org/debian $distro-backports main
-deb-src http://ftp.debian.org/debian $distro-backports main
-deb http://security.debian.org/debian-security $distro/updates main contrib non-free
-deb-src http://security.debian.org/debian-security $distro/updates main contrib non-free
+deb http://ftp.debian.org/debian $DISTRO main contrib non-free
+deb-src http://ftp.debian.org/debian $DISTRO main contrib non-free
+deb http://ftp.debian.org/debian $DISTRO-updates main contrib non-free
+deb-src http://ftp.debian.org/debian $DISTRO-updates main contrib non-free
+deb http://ftp.debian.org/debian $DISTRO-backports main
+deb-src http://ftp.debian.org/debian $DISTRO-backports main
+deb http://security.debian.org/debian-security $DISTRO/updates main contrib non-free
+deb-src http://security.debian.org/debian-security $DISTRO/updates main contrib non-free
 EOT
 
 cat <<EOT > $MOUNT/etc/apt/apt.conf.d/71-no-recommends
