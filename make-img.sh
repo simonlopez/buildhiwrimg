@@ -10,14 +10,20 @@
 ##########
 # CONFIG #
 ##########
+# board type (A13 or A20)
+if [ $BOARD != "A20" ]
+then
+  BOARD="A13"
+fi
+echo $BOARD
+
 # sd image size
-SDIMG_MB="2048"
+SDIMG_MB="4096"
 # image file
-SDIMG_FILE="$HOME/hiwr.sdimg"
+SDIMG_FILE="$HOME/$BOARD-hiwr.img"
 # build directory
-BUILD_DIR="$HOME/hiwr-build"
-# DISTRO
-DISTRO=wheezy
+BUILD_DIR="$HOME/$BOARD-hiwr-build"
+
 
 #########
 # BUILD #
@@ -30,74 +36,98 @@ show_time() {
   printf "%02d:%02d:%02d\n" $h $m $s
 }
 
-ARCH=`dpkg --print-architecture`
-
-if [ ! -e $BUILD_DIR ]
+rm -Rf $BUILD_DIR
+echo === Building ===
+START=`date +"%s"`
+mkdir $BUILD_DIR
+cd $BUILD_DIR
+# add emdebian repositories
+grep "emdebian" /etc/apt/sources.list > /dev/null 2> /dev/null
+if [ $? -ne 0 ]
 then
-  echo === Building ===
-  START=`date +"%s"`
-  mkdir $BUILD_DIR
-  cd $BUILD_DIR
-  case $ARCH in
-    armhf)
-      echo "armhf, no cross compile needed"
-      apt-get install -y gcc-4.7
-      ;;
-    *)
-      echo "$ARCH crosscompile needed"
-      # add emdebian repositories
-      grep "emdebian" /etc/apt/sources.list > /dev/null 2> /dev/null
-      if [ $? -ne 0 ]
-      then
-        echo "deb http://www.emdebian.org/debian wheezy main" >> /etc/apt/sources.list
-        echo "deb http://www.emdebian.org/debian sid main" >> /etc/apt/sources.list
-      fi
-      # install needed packages
-      apt-get update
-      apt-get install -y emdebian-archive-keyring
-      apt-get install -y gcc-4.7-arm-linux-gnueabihf
-  esac
-  apt-get install -y parted ncurses-dev uboot-mkimage build-essential git dosfstools kpartx qemu-user-static debootstrap binfmt-support qemu
-  # a little hack
-  rm /usr/bin/arm-linux-gnueabihf-gcc
+  echo "deb http://ftp.uk.debian.org/emdebian/toolchains/ wheezy main" >> /etc/apt/sources.list
+  echo "deb http://ftp.uk.debian.org/emdebian/toolchains/ sid main" >> /etc/apt/sources.list
+fi
+# install needed packages
+apt-get update
+apt-get install -y emdebian-archive-keyring
+apt-get install -y parted gcc-4.7-arm-linux-gnueabihf ncurses-dev uboot-mkimage build-essential git dosfstools kpartx qemu-user-static debootstrap binfmt-support qemu
+# a little hack
+if [ -e /usr/bin/arm-linux-gnueabihf-gcc ]
+then
   ln -s /usr/bin/arm-linux-gnueabihf-gcc-4.7 /usr/bin/arm-linux-gnueabihf-gcc
-  echo === Building Uboot ===
-  rm -Rf u-boot-sunxi
-  git clone -b sunxi https://github.com/linux-sunxi/u-boot-sunxi.git
-  cd u-boot-sunxi
+fi
+
+echo === Building sunxi-tools ===
+apt-get install libusb-1.0.0-dev pkg-config
+rm -Rf sunxi-tools
+git clone https://github.com/linux-sunxi/sunxi-tools
+cd sunxi-tools
+make
+cd ..
+
+echo === Building Uboot ===
+rm -Rf u-boot-sunxi
+git clone -b sunxi https://github.com/linux-sunxi/u-boot-sunxi.git
+cd u-boot-sunxi
+if [ $BOARD == "A20" ]
+then
+  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- A20-OLinuXino-Micro_config
+else
   make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- A13-OLinuXino_config
-  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
-  ls u-boot.bin u-boot-sunxi-with-spl.bin spl/sunxi-spl.bin
-  echo === Building kernel ===
-  cd $BUILD_DIR
-  rm -Rf linux-sunxi
-  git clone https://github.com/linux-sunxi/linux-sunxi
-  cd linux-sunxi
-  wget "https://gist.githubusercontent.com/simonlopez/51741b8a440b627b3394/raw/35c0ee3ebd82cba16e6fca70560e1a992e74bf3d/a13_olimex_kernel_config" -O ./arch/arm/configs/a13_linux_defconfig
-  wget "https://gist.githubusercontent.com/simonlopez/51741b8a440b627b3394/raw/96cc2adee80d0e57ad85ded511d1992c0d335e4d/hiwr_kernel_config" -O hiwr-config
-  # Adding missing config
+fi
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+ls u-boot.bin u-boot-sunxi-with-spl.bin spl/sunxi-spl.bin
+echo === Building kernel ===
+cd $BUILD_DIR
+rm -Rf linux-sunxi
+git clone https://github.com/linux-sunxi/linux-sunxi
+cd linux-sunxi
+wget "https://github.com/simonlopez/buildhiwrimg/conf/hiwr_kernel_config" -O hiwr-config
+if [ $BOARD == "A20" ]
+then
+  wget "https://github.com/linux-sunxi/sunxi-boards/raw/master/sys_config/a20/a20-olinuxino_micro-lcd7.fex" -O script.a20.fex
+  ../sunxi-tools/fex2bin script.a20.fex script.bin
+  wget "https://github.com/simonlopez/buildhiwrimg/conf/a20_olimex_kernel_config" -O ./arch/arm/configs/a20_olimex_kernel_config
+  echo "# Hiwr specific lines" >> ./arch/arm/configs/a20_olimex_kernel_config
+  echo "SUN4I_GPIO_UGLY=y" >> ./arch/arm/configs/a20_olimex_kernel_config
+  while read line
+  do
+    grep $line ./arch/arm/configs/a20_olimex_kernel_config > /dev/null 2> /dev/null
+    if [ $? -ne 0 ]
+    then
+      echo $line >> ./arch/arm/configs/a20_olimex_kernel_config
+    fi
+  done < hiwr-config
+  make ARCH=arm a20_olimex_kernel_config
+else # A13
+  wget "https://github.com/linux-sunxi/sunxi-boards/raw/master/sys_config/a13/a13-olinuxino-lcd7.fex" -O script.a13.fex
+  ../sunxi-tools/fex2bin script.a13.fex script.bin
+  wget "https://github.com/simonlopez/buildhiwrimg/conf/a13_olimex_kernel_config" -O ./arch/arm/configs/a13_olimex_kernel_config
   echo "# Hiwr specific lines" >> ./arch/arm/configs/a13_linux_defconfig
   echo "SUN4I_GPIO_UGLY=y" >> ./arch/arm/configs/a13_linux_defconfig
   while read line
   do
-    grep $line a13_linux_defconfig > /dev/null 2> /dev/null
+    grep $line ./arch/arm/configs/a13_linux_defconfig > /dev/null 2> /dev/null
     if [ $? -ne 0 ]
     then
       echo $line >> ./arch/arm/configs/a13_linux_defconfig
     fi
   done < hiwr-config
-  rm hiwr-config
-
   make ARCH=arm a13_linux_defconfig
-  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j4 uImage
-  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j4 INSTALL_MOD_PATH=out modules
-  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j4 INSTALL_MOD_PATH=out modules_install
-
-  ls out/lib/modules/*/
-  END=`date +"%s"`
-  echo -n "Building duration: "
-  show_time $START $END
 fi
+rm hiwr-config
+
+sed -i 's/CONFIG_IPV6=m/CONFIG_IPV6=y/' .config
+
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j4 uImage
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j4 INSTALL_MOD_PATH=out modules
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j4 INSTALL_MOD_PATH=out modules_install
+
+ls out/lib/modules/*/
+END=`date +"%s"`
+echo -n "Building duration: "
+show_time $START $END
 
 START=`date +"%s"`
 cd $BUILD_DIR
@@ -171,22 +201,18 @@ dd if=u-boot-sunxi/u-boot-sunxi-with-spl.bin of=/dev/$LOOP bs=1024 seek=8
 sync
 mount $PART1 $MOUNT
 cp linux-sunxi/arch/arm/boot/uImage $MOUNT
-wget "https://www.dropbox.com/s/xcu1u4xygsps3el/script.bin" -O $MOUNT/script.bin
+cp linux-sunxi/script.bin $MOUNT/script.bin
 sync
 umount $MOUNT
 
 echo === Build pure Debian armhf rootfs ===
 cd $BUILD_DIR
 mount $PART2 $MOUNT
+distro=wheezy
 
 echo === debootstrap first phase ===
-debootstrap --arch=armhf --foreign $DISTRO $MOUNT http://ftp.debian.org/debian
-
-if [ $ARCH != "armhf" ]
-then
-  cp /usr/bin/qemu-arm-static $MOUNT/usr/bin/
-fi
-
+debootstrap --arch=armhf --foreign $distro $MOUNT http://ftp.debian.org/debian
+cp /usr/bin/qemu-arm-static $MOUNT/usr/bin/
 cp /etc/resolv.conf $MOUNT/etc
 
 echo === debootstrap second phase ===
@@ -207,14 +233,14 @@ fi
 
 echo === post debootstrap ===
 cat <<EOT > $MOUNT/etc/apt/sources.list
-deb http://ftp.debian.org/debian $DISTRO main contrib non-free
-deb-src http://ftp.debian.org/debian $DISTRO main contrib non-free
-deb http://ftp.debian.org/debian $DISTRO-updates main contrib non-free
-deb-src http://ftp.debian.org/debian $DISTRO-updates main contrib non-free
-deb http://ftp.debian.org/debian $DISTRO-backports main
-deb-src http://ftp.debian.org/debian $DISTRO-backports main
-deb http://security.debian.org/debian-security $DISTRO/updates main contrib non-free
-deb-src http://security.debian.org/debian-security $DISTRO/updates main contrib non-free
+deb http://ftp.debian.org/debian $distro main contrib non-free
+deb-src http://ftp.debian.org/debian $distro main contrib non-free
+deb http://ftp.debian.org/debian $distro-updates main contrib non-free
+deb-src http://ftp.debian.org/debian $distro-updates main contrib non-free
+deb http://ftp.debian.org/debian $distro-backports main contrib non-free
+deb-src http://ftp.debian.org/debian $distro-backports main contrib non-free
+deb http://security.debian.org/debian-security $distro/updates main contrib non-free
+deb-src http://security.debian.org/debian-security $distro/updates main contrib non-free
 EOT
 
 cat <<EOT > $MOUNT/etc/apt/apt.conf.d/71-no-recommends
@@ -262,7 +288,7 @@ catkin_init_workspace
 cd
 mkdir libs
 cd libs
-apt-get install -y build-essential make libjpeg8-dev libjpeg8 pkg-config vflib3 vflib3-dev libfontconfig1-dev libfontconfig1 libfribidi-dev libfribidi0 git xorg-dev xutils-dev x11proto-dri2-dev libltdl-dev libtool automake libdrm-dev autoconf xutils-dev libgif4 libgif-dev debhelper dh-autoreconf pkg-config libpng12-0 libpng12-dev libtiff5 libtiff5-dev libperl-dev libgtk2.0-dev libpulse0 libpulse-dev libsndfile1 libsndfile1-dev x11proto-print-dev libxp-dev libxp6 libudev-dev libudev1 libmount-dev libmount1 libblkid-dev libbullet-dev bison flex libgles2-mesa-dev libluajit-5.1-dev libts-0.0-0 libdbus-glib-1-2 libdbus-glib-1-dev
+apt-get install -y quilt gtk-doc-tools cdbs build-essential make libjpeg8-dev libjpeg8 pkg-config vflib3 vflib3-dev libfontconfig1-dev libfontconfig1 libfribidi-dev libfribidi0 git xorg-dev xutils-dev x11proto-dri2-dev libltdl-dev libtool automake libdrm-dev autoconf xutils-dev libgif4 libgif-dev debhelper dh-autoreconf libpng12-0 libpng12-dev libtiff5 libtiff5-dev libperl-dev libgtk2.0-dev libpulse0 libpulse-dev libsndfile1 libsndfile1-dev x11proto-print-dev libxp-dev libxp6 libudev-dev libudev1 libmount-dev libmount1 libblkid-dev libbullet-dev python-dbus python-dbus-dev
 apt-get clean
 
 # http://linux-sunxi.org/Xorg#fbturbo_driver
@@ -276,14 +302,12 @@ make
 make install
 cp xorg.conf /etc/X11/xorg.conf
 cd ..
-rm -Rf xf86-video-fbturbo
-
 git clone https://github.com/linux-sunxi/libump.git
 cd libump
 dpkg-buildpackage -b
-dpkg -i ../libump*.deb
 cd ..
 rm -Rf libump
+dpkg -i libump*.deb
 
 git clone https://github.com/robclark/libdri2
 cd libdri2
@@ -293,96 +317,67 @@ make
 make install
 ldconfig
 cd ..
-rm -Rf libdri2
 
-git clone https://github.com/linux-sunxi/sunxi-mali.git
+#git clone https://github.com/linux-sunxi/sunxi-mali.git
+git clone https://github.com/Hiwr/sunxi-mali
 cd sunxi-mali
-# fix for being able to build efl later
-git pull https://github.com/raoulh/sunxi-mali/
 git submodule init
 git submodule update
 ABI=armhf VERSION=r3p0 make config
 make install
 cd ..
-rm -Rf sunxi-mali
-
 
 wget http://luajit.org/download/LuaJIT-2.0.3.tar.gz
 tar zxf LuaJIT-2.0.3.tar.gz
 cd LuaJIT-2.0.3
-make
-make install
-make clean
+wget http://ftp.de.debian.org/debian/pool/main/l/luajit/luajit_2.0.3+dfsg-3.debian.tar.xz
+tar Jxf luajit_2.0.3+dfsg-3.debian.tar.xz
+rm luajit_2.0.3+dfsg-3.debian.tar.xz
+dpkg-buildpackage -b
 cd ..
-rm -Rf LuaJIT-2.0.3 LuaJIT-2.0.3.tar.gz
+rm -Rf LuaJIT-2.0.3*
+dpkg -i libluajit*.deb
 
-wget http://gstreamer.freedesktop.org/src/gstreamer/gstreamer-1.4.3.tar.xz
-tar xJf gstreamer-1.4.3.tar.xz
-cd gstreamer-1.4.3
-./configure
-make
-make install
+wget http://gstreamer.freedesktop.org/src/orc/orc-0.4.22.tar.xz
+tar -Jxf orc-0.4.22.tar.xz
+cd orc-0.4.22
+wget http://ftp.de.debian.org/debian/pool/main/o/orc/orc_0.4.22-1.debian.tar.xz
+tar -Jxf orc_0.4.22-1.debian.tar.xz
+rm orc_0.4.22-1.debian.tar.xz
+dpkg-buildpackage -b
 cd ..
-rm -Rf gstreamer-1.4.3 gstreamer-1.4.3.tar.xz
+rm -Rf orc*
+dpkg -i liborc-0.4-*.deb
 
-wget http://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.4.3.tar.xz
-tar xJf gst-plugins-base-1.4.3.tar.xz
-cd gst-plugins-base-1.4.3
-./configure
-make
-make install
-cd ..
-rm -Rf gst-plugins-base-1.4.3 gst-plugins-base-1.4.3.tar.xz
+apt-get remove -y quilt gtk-doc-tools cdbs
+apt-get install -y libgstreamer1.0-dev libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+apt-get clean
 
 wget http://download.enlightenment.org/rel/libs/efl/efl-1.11.2.tar.gz
 tar xzf efl-1.11.2.tar.gz
 cd efl-1.11.2
-./configure --prefix=/usr CFLAGS='-march=armv7-a -mtune=cortex-a8 -mfloat-abi=hard -mfpu=neon -O2 -g' CXXFLAGS='-march=armv7-a -mtune=cortex-a8 -mfloat-abi=hard -mfpu=neon -O2 -g'
-make
+CFLAGS="-O3 -mfpu=neon -mcpu=cortex-a8 -mtune=cortex-a8" ./configure --prefix=/usr
 make install
 cd ..
-rm -Rf xzf efl-1.11.2.tar.gz efl-1.11.2
-
-wget http://dbus.freedesktop.org/releases/dbus-python/dbus-python-0.84.0.tar.gz
-tar xzf dbus-python-0.84.0.tar.gz
-cd dbus-python-0.84.0
-./configure
-make
-make install
-cd ..
-rm -Rf dbus-python-0.84.0 dbus-python-0.84.0.tar.gz
+rm -Rf efl-1.11.2*
 
 wget http://download.enlightenment.org/rel/libs/elementary/elementary-1.11.2.tar.gz
 tar xzf elementary-1.11.2.tar.gz
 cd elementary-1.11.2
-./configure --prefix=/usr
-make
+CFLAGS="-O3 -mfpu=neon -mcpu=cortex-a8 -mtune=cortex-a8" ./configure --prefix=/usr
 make install
+cd ..
+rm -Rf elementary-1.11.2*
+
 wget http://download.enlightenment.org/rel/bindings/python/python-efl-1.11.0.tar.gz
 tar xzf python-efl-1.11.0.tar.gz
 cd python-efl-1.11.0
 python setup.py build
 python setup.py install
 cd ..
-rm -Rf python-efl-1.11.0 python-efl-1.11.0.tar.gz
+rm -Rf python-efl-1.11.0*
 
-# http://olimex.wordpress.com/2012/12/19/a13-lcd7ts-support-in-linux/
-#git clone https://github.com/kergoth/tslib
-#cd tslib
-#wget https://raw.githubusercontent.com/OLIMEX/OLINUXINO/master/SOFTWARE/A13/TOUCHSCREEN/tslib.patch
-#patch -p1 < tslib.patch
-#autoreconf -vi
-#./configure
-#make
-#make install
-
-
-mkdir /usr/lib/arm-linux-gnueabihf/bak
-mv /usr/lib/arm-linux-gnueabihf/libGLES* /usr/lib/arm-linux-gnueabihf/bak
-mv /usr/lib/arm-linux-gnueabihf/libEGL* /usr/lib/arm-linux-gnueabihf/bak
-
-cd ..
-rm -Rf libs
+apt-get install -y python-opencv
 
 EOT
 
@@ -390,7 +385,7 @@ EOT
 chmod +x $MOUNT/root/finish.sh
 LC_ALL=C LANGUAGE=C LANG=C chroot $MOUNT /root/finish.sh
 
-#exit
+exit
 
 rm $MOUNT/root/finish.sh
 
@@ -402,10 +397,7 @@ for i in $mnt_devices ; do
 done
 
 rm $MOUNT/etc/resolv.conf
-if [ $ARCH != "armhf" ]
-then
-  rm $MOUNT/usr/bin/qemu-arm-static
-fi
+rm $MOUNT/usr/bin/qemu-arm-static
 
 sync
 sleep 10
