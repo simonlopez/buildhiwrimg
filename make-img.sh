@@ -88,33 +88,33 @@ if [ $BOARD == "A20" ]
 then
   wget "https://github.com/linux-sunxi/sunxi-boards/raw/master/sys_config/a20/a20-olinuxino_micro-lcd7.fex" -O script.a20.fex
   ../sunxi-tools/fex2bin script.a20.fex script.bin
-  wget "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/conf/a20_olimex_kernel_config" -O ./arch/arm/configs/a20_olimex_kernel_config
-  echo "# Hiwr specific lines" >> ./arch/arm/configs/a20_olimex_kernel_config
-  echo "SUN4I_GPIO_UGLY=y" >> ./arch/arm/configs/a20_olimex_kernel_config
+  wget "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/conf/a20_olimex_kernel_config" -O ./arch/arm/configs/a20_olimex_defconfig
+  echo "# Hiwr specific lines" >> ./arch/arm/configs/a20_olimex_defconfig
+  echo "SUN4I_GPIO_UGLY=y" >> ./arch/arm/configs/a20_olimex_defconfig
   while read line
   do
-    grep $line ./arch/arm/configs/a20_olimex_kernel_config > /dev/null 2> /dev/null
+    grep $line ./arch/arm/configs/a20_olimex_defconfig > /dev/null 2> /dev/null
     if [ $? -ne 0 ]
     then
-      echo $line >> ./arch/arm/configs/a20_olimex_kernel_config
+      echo $line >> ./arch/arm/configs/a20_olimex_defconfig
     fi
   done < hiwr-config
-  make ARCH=arm a20_olimex_kernel_config
+  make ARCH=arm a20_olimex_defconfig
 else # A13
   wget "https://github.com/linux-sunxi/sunxi-boards/raw/master/sys_config/a13/a13-olinuxino-lcd7.fex" -O script.a13.fex
   ../sunxi-tools/fex2bin script.a13.fex script.bin
-  wget "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/conf/a13_olimex_kernel_config" -O ./arch/arm/configs/a13_olimex_kernel_config
-  echo "# Hiwr specific lines" >> ./arch/arm/configs/a13_linux_defconfig
-  echo "SUN4I_GPIO_UGLY=y" >> ./arch/arm/configs/a13_linux_defconfig
+  wget "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/conf/a13_olimex_kernel_config" -O ./arch/arm/configs/a13_olimex_defconfig
+  echo "# Hiwr specific lines" >> ./arch/arm/configs/a13_olimex_defconfig
+  echo "SUN4I_GPIO_UGLY=y" >> ./arch/arm/configs/a13_olimex_defconfig
   while read line
   do
-    grep $line ./arch/arm/configs/a13_linux_defconfig > /dev/null 2> /dev/null
+    grep $line ./arch/arm/configs/a13_olimex_defconfig > /dev/null 2> /dev/null
     if [ $? -ne 0 ]
     then
-      echo $line >> ./arch/arm/configs/a13_linux_defconfig
+      echo $line >> ./arch/arm/configs/a13_olimex_defconfig
     fi
   done < hiwr-config
-  make ARCH=arm a13_linux_defconfig
+  make ARCH=arm a13_olimex_defconfig
 fi
 rm hiwr-config
 
