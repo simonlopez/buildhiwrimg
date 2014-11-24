@@ -83,12 +83,12 @@ cd $BUILD_DIR
 rm -Rf linux-sunxi
 git clone https://github.com/linux-sunxi/linux-sunxi
 cd linux-sunxi
-wget "https://github.com/simonlopez/buildhiwrimg/conf/hiwr_kernel_config" -O hiwr-config
+wget "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/conf/hiwr_kernel_config" -O hiwr-config
 if [ $BOARD == "A20" ]
 then
   wget "https://github.com/linux-sunxi/sunxi-boards/raw/master/sys_config/a20/a20-olinuxino_micro-lcd7.fex" -O script.a20.fex
   ../sunxi-tools/fex2bin script.a20.fex script.bin
-  wget "https://github.com/simonlopez/buildhiwrimg/conf/a20_olimex_kernel_config" -O ./arch/arm/configs/a20_olimex_kernel_config
+  wget "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/conf/a20_olimex_kernel_config" -O ./arch/arm/configs/a20_olimex_kernel_config
   echo "# Hiwr specific lines" >> ./arch/arm/configs/a20_olimex_kernel_config
   echo "SUN4I_GPIO_UGLY=y" >> ./arch/arm/configs/a20_olimex_kernel_config
   while read line
@@ -103,7 +103,7 @@ then
 else # A13
   wget "https://github.com/linux-sunxi/sunxi-boards/raw/master/sys_config/a13/a13-olinuxino-lcd7.fex" -O script.a13.fex
   ../sunxi-tools/fex2bin script.a13.fex script.bin
-  wget "https://github.com/simonlopez/buildhiwrimg/conf/a13_olimex_kernel_config" -O ./arch/arm/configs/a13_olimex_kernel_config
+  wget "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/conf/a13_olimex_kernel_config" -O ./arch/arm/configs/a13_olimex_kernel_config
   echo "# Hiwr specific lines" >> ./arch/arm/configs/a13_linux_defconfig
   echo "SUN4I_GPIO_UGLY=y" >> ./arch/arm/configs/a13_linux_defconfig
   while read line
