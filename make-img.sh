@@ -263,6 +263,7 @@ echo === finish configuration ===
 cat <<EOT > $MOUNT/root/finish.sh
 #!/bin/bash
 echo "hiwr" > /etc/hostname
+echo "127.0.0.1 hiwr" > /etc/hosts
 echo "mali" >> /etc/modules
 echo "KERNEL=="mali", MODE="0660", GROUP="video"" > /etc/udev/rules.d/50-mali.rules
 echo "KERNEL=="ump", MODE="0660", GROUP="video"" >> /etc/udev/rules.d/50-mali.rules
@@ -286,6 +287,7 @@ apt-get clean
 rosdep init
 rosdep update
 echo "source /opt/ros/hydro/setup.bash" >> ~/.bashrc
+echo "source /root/catkin_ws/devel/setup.bash" >> ~/.bashrc
 source /opt/ros/hydro/setup.bash
 mkdir -p ~/catkin_ws/src
 cd ~/catkin_ws/src
