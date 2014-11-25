@@ -101,8 +101,8 @@ then
       echo $line >> ./arch/arm/configs/a20_olimex_defconfig
     fi
   done < hiwr-config
-  wget "https://raw.githubusercontent.com/OLIMEX/OLINUXINO/master/SOFTWARE/A20/A20%20images%20build%20instructions/Kernel%20version%203.4.90+/spi-sun7i.c" -O drivers/spi/spi-sun7i.c
-  wget "https://raw.githubusercontent.com/OLIMEX/OLINUXINO/master/SOFTWARE/A20/A20%20images%20build%20instructions/Kernel%20version%203.4.90+/SPI.patch" -O SPI.patch
+  wget "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/patch/spi-sun7i.c" -O drivers/spi/spi-sun7i.c
+  get "https://raw.githubusercontent.com/simonlopez/buildhiwrimg/master/patch/SPI.patch" -O SPI.patch
   patch -p0 < SPI.patch
   rm SPI.patch
   make ARCH=arm a20_olimex_defconfig
