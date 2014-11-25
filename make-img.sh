@@ -293,7 +293,7 @@ catkin_init_workspace
 cd
 mkdir libs
 cd libs
-apt-get install -y quilt gtk-doc-tools cdbs build-essential make libjpeg8-dev libjpeg8 pkg-config vflib3 vflib3-dev libfontconfig1-dev libfontconfig1 libfribidi-dev libfribidi0 git xorg-dev xutils-dev x11proto-dri2-dev libltdl-dev libtool automake libdrm-dev autoconf xutils-dev libgif4 libgif-dev debhelper dh-autoreconf libpng12-0 libpng12-dev libtiff5 libtiff5-dev libperl-dev libgtk2.0-dev libpulse0 libpulse-dev libsndfile1 libsndfile1-dev x11proto-print-dev libxp-dev libxp6 libudev-dev libudev1 libmount-dev libmount1 libblkid-dev libbullet-dev python-dbus python-dbus-dev
+apt-get install -y quilt gtk-doc-tools cdbs build-essential make libjpeg8-dev libjpeg8 pkg-config vflib3 vflib3-dev libfontconfig1-dev libfontconfig1 libfribidi-dev libfribidi0 git xorg-dev xutils-dev x11proto-dri2-dev libltdl-dev libtool automake libdrm-dev autoconf xutils-dev libgif4 libgif-dev debhelper dh-autoreconf libpng12-0 libpng12-dev libtiff5 libtiff5-dev libperl-dev libgtk2.0-dev libpulse0 libpulse-dev libsndfile1 libsndfile1-dev x11proto-print-dev libxp-dev libxp6 libudev-dev libudev1 libmount-dev libmount1 libblkid-dev libbullet-dev python-dbus python-dbus-dev libfreetype6-dev
 apt-get clean
 
 # http://linux-sunxi.org/Xorg#fbturbo_driver
@@ -390,13 +390,12 @@ EOT
 chmod +x $MOUNT/root/finish.sh
 LC_ALL=C LANGUAGE=C LANG=C chroot $MOUNT /root/finish.sh
 
-exit
-
 rm $MOUNT/root/finish.sh
 
 sync
 
 echo === umount ===
+mnt_devices="proc dev/pts dev sys"
 for i in $mnt_devices ; do
   umount -l "$MOUNT"/$i
 done
