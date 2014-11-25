@@ -17,6 +17,8 @@ then
 fi
 echo $BOARD
 
+#distro
+distro=wheezy
 # sd image size
 SDIMG_MB="4096"
 # image file
@@ -99,6 +101,10 @@ then
       echo $line >> ./arch/arm/configs/a20_olimex_defconfig
     fi
   done < hiwr-config
+  wget "https://raw.githubusercontent.com/OLIMEX/OLINUXINO/master/SOFTWARE/A20/A20%20images%20build%20instructions/Kernel%20version%203.4.90+/spi-sun7i.c" -O drivers/spi/spi-sun7i.c
+  wget "https://raw.githubusercontent.com/OLIMEX/OLINUXINO/master/SOFTWARE/A20/A20%20images%20build%20instructions/Kernel%20version%203.4.90+/SPI.patch" -O SPI.patch
+  patch -p0 < SPI.patch
+  rm SPI.patch
   make ARCH=arm a20_olimex_defconfig
 else # A13
   wget "https://github.com/linux-sunxi/sunxi-boards/raw/master/sys_config/a13/a13-olinuxino-lcd7.fex" -O script.a13.fex
@@ -208,7 +214,6 @@ umount $MOUNT
 echo === Build pure Debian armhf rootfs ===
 cd $BUILD_DIR
 mount $PART2 $MOUNT
-distro=wheezy
 
 echo === debootstrap first phase ===
 debootstrap --arch=armhf --foreign $distro $MOUNT http://ftp.debian.org/debian
