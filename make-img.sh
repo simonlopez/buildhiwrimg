@@ -11,7 +11,7 @@
 # CONFIG #
 ##########
 # board type (A13 or A20)
-if [ $BOARD != "A20" ]
+if [ -z "$BOARD" ]
 then
   BOARD="A13"
 fi
